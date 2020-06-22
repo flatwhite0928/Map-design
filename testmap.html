@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Display a map</title>
+<meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v1.11.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v1.11.0/mapbox-gl.css" rel="stylesheet" />
+<script src='https://unpkg.com/@turf/turf/turf.min.js'></script>
+<!-- <script data-main="scripts/main" src="scripts/require.js"></script> -->
+<style>
+	body { margin: 0; padding: 0; }
+	#map { position: absolute; top: 0; bottom: 0; width: 100%; }
+</style>
+</head>
+<body>
+<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.5.1/mapbox-gl-geocoder.min.js"></script>
+<link
+    rel="stylesheet"
+    href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.5.1/mapbox-gl-geocoder.css"
+    type="text/css"
+    />
+<!-- Promise polyfill script required to use Mapbox GL Geocoder in IE 11 -->
+<script src="https://cdn.jsdelivr.net/npm/es6-promise@4/dist/es6-promise.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/es6-promise@4/dist/es6-promise.auto.min.js"></script>
+<div id="map"></div>
+
+<script>
+	mapboxgl.accessToken = 'pk.eyJ1IjoiZHVvbmkiLCJhIjoiY2tiaTRoOXkwMDd3eDJ6cXBxbGY5MGZxNiJ9.CpYIbzw9TXcCcDUQSw7XIA';
+    var map = new mapboxgl.Map({
+        container: 'map', // container id
+        style: 'mapbox://styles/duoni/ckbjr0m1u01nh1hnms3yfjd2d', // stylesheet location
+        center: [-77.033406, 38.901145], // starting position [lng, lat]
+        zoom: 10.7 // starting zoom
+    });
+
+    map.addControl(
+		new MapboxGeocoder({
+		accessToken: mapboxgl.accessToken,
+		mapboxgl: mapboxgl
+		})
+	);
+
+	map.on('load', function() {
+	        // Add a geojson point source.
+	        // Heatmap layers also work with a vector tile source.
+	        map.addSource('crash', {
+	            'type': 'geojson',
+	            'data': 'https://raw.githubusercontent.com/flatwhite0928/Map-design/master/dc_aggregated_crash.geojson'//'./dc_aggregated_crash.geojson'
+	        });
+
+	        map.addLayer(
+	            {
+	                'id': 'crash-heat',
+	                'type': 'heatmap',
+	                'source': 'crash',
+	                filter: [
+					  "all",
+					  [">", ["get", "mag"], 0]
+					],
+	                'maxzoom': 12,
+	                'paint': {
+	                    // Increase the heatmap weight based on frequency and property magnitude
+	                    'heatmap-weight': [
+						  "interpolate",
+						  ["linear"],
+						  ["zoom"],
+						  0,
+						  1,
+						  22,
+						  0.8
+						],
+	                    // Increase the heatmap color weight weight by zoom level
+	                    // heatmap-intensity is a multiplier on top of heatmap-weight
+	                    'heatmap-intensity': [
+						  "interpolate",
+						  ["linear"],
+						  ["zoom"],
+						  0,
+						  0.6,
+						  22,
+						  1
+						],
+	                    // Color ramp for heatmap.  Domain is 0 (low) to 1 (high).
+	                    // Begin color ramp at 0-stop with a 0-transparancy color
+	                    // to create a blur-like effect.
+	                    'heatmap-color': [
+	                        'interpolate',
+	                        ['linear'],
+	                        ['heatmap-density'],
+	                        0,
+	                        'rgba(33,102,172,0)',
+	                        0.2,
+	                        'rgb(103,169,207)',
+	                        0.4,
+	                        'rgb(209,229,240)',
+	                        0.6,
+	                        'rgb(253,219,199)',
+	                        0.8,
+	                        'rgb(239,138,98)',
+	                        1,
+	                        'rgb(178,24,43)'
+	                    ],
+	                    // Adjust the heatmap radius by zoom level
+	                    'heatmap-radius': [
+						  "interpolate",
+						  ["linear"],
+						  ["get", "mag"],
+						  0,
+						  40,
+						  11303,
+						  140
+						],
+	                    // Transition from heatmap to circle layer by zoom level
+	                    'heatmap-opacity': [
+						  "interpolate",
+						  ["linear"],
+						  ["zoom"],
+						  0,
+						  0.14,
+						  22,
+						  0.71
+						]
+	                }
+	            },
+	            'waterway-label'
+	        );
+
+	        map.addLayer(
+	            {
+	                'id': 'crash-point',
+	                'type': 'circle',
+	                'source': 'crash',
+	                filter: [
+					  "all",
+					  [">", ["get", "mag"], 0]
+					],
+	                'minzoom': 10,
+	                'paint': {
+	                    // Size circle radius by earthquake magnitude and zoom level
+	                    'circle-radius': [
+						  "interpolate",
+						  ["linear"],
+						  ["zoom"],
+						  8,
+						  [
+						    "interpolate",
+						    ["linear"],
+						    ["get", "mag"],
+						    0,
+						    0,
+						    11303,
+						    2
+						  ],
+						  17,
+						  [
+						    "interpolate",
+						    ["linear"],
+						    ["get", "mag"],
+						    0,
+						    15,
+						    10557,
+						    55
+						  ]
+						],
+	                    // Color circle by earthquake magnitude
+	                    'circle-color': [
+						  "interpolate",
+						  ["linear"],
+						  ["get", "mag"],
+						  0,
+						  "hsl(0, 15%, 95%)",
+						  11303,
+						  "hsl(0, 58%, 58%)"
+						],
+	                    'circle-stroke-color': "hsl(33, 57%, 92%)",
+	                    'circle-stroke-width': [
+						  "interpolate",
+						  ["linear"],
+						  ["zoom"],
+						  11,
+						  2,
+						  16,
+						  5
+						],
+	                    // Transition from heatmap to circle layer by zoom level
+	                    'circle-opacity': [
+						  "interpolate",
+						  ["linear"],
+						  ["zoom"],
+						  8,
+						  [
+						    "interpolate",
+						    ["linear"],
+						    ["get", "mag"],
+						    0,
+						    0.05,
+						    11303,
+						    0.4
+						  ],
+						  22,
+						  [
+						    "interpolate",
+						    ["linear"],
+						    ["get", "mag"],
+						    0,
+						    0.25,
+						    11303,
+						    0.8
+						  ]
+						]
+	                }
+	            },
+	            'waterway-label'
+	        );
+
+	        map.addLayer({
+				id: 'crash-count',
+				type: 'symbol',
+				source: 'crash',
+				filter: [
+				  "all",
+				  [">", ["get", "mag"], 0]
+				],
+				minzoom: 11,
+				layout: {
+					'text-field': ["to-string", ["get", "mag"]],
+					'text-font': [
+					  "Open Sans Condensed Bold",
+					  "Arial Unicode MS Regular"
+					],
+					'text-size': 13
+				}
+			});
+
+			map.addLayer({
+				'id': 'crash-fill',
+				'type': 'fill',
+				'source': 'crash',
+				filter: [
+				  "all",
+				  [">", ["get", "mag"], 0]
+				],
+				'minzoom': 12.3,
+				'layout': {},
+				'paint': {
+					'fill-color': [
+					  "interpolate",
+					  ["linear"],
+					  ["get", "mag"],
+					  0,
+					  "hsl(106, 65%, 39%)",
+					  1500,
+					  "hsl(54, 96%, 56%)",
+					  11303,
+					  "hsl(0, 93%, 47%)"
+					],
+					'fill-opacity': 0.45
+				}
+			});
+	    });
+	// });
+
+</script>
+
+</body>
+</html>
